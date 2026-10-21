@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.venv/
+venv/
+env/
+
+# Training data and exploratory image samples
+/assets/
+/trial/
+
+# IDE and operating-system files
+.vs/
+**/.vs/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.DS_Store
+Thumbs.db
+
+# Logs and test caches
+*.log
+.pytest_cache/
+.mypy_cache/
