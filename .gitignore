@@ -24,3 +24,7 @@ Thumbs.db
 *.log
 .pytest_cache/
 .mypy_cache/
+
+# Locally trained model artifacts
+/model_terbaik.keras
+/model_terbaik.h5
