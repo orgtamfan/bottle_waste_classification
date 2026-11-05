@@ -1,70 +1,113 @@
+"""Train a three-class bottle-material classifier."""
+import json
 from pathlib import Path
 
 import tensorflow as tf
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+from tensorflow.keras.layers import Dense, Dropout, GlobalAveragePooling2D
 from tensorflow.keras.models import Model
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
-# --- 1. Persiapan Data ---
-project_root = Path(__file__).resolve().parents[2]
-data_dir = project_root / 'assets'
-
-datagen = ImageDataGenerator(
-    rescale=1./255,
-    validation_split=0.2,
-    rotation_range=20,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    horizontal_flip=True
-)
-
-train_generator = datagen.flow_from_directory(
-    data_dir,
-    target_size=(224, 224),
-    batch_size=32,
-    class_mode='categorical',
-    subset='training'
-)
-
-validation_generator = datagen.flow_from_directory(
-    data_dir,
-    target_size=(224, 224),
-    batch_size=32,
-    class_mode='categorical',
-    subset='validation'
-)
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = PROJECT_ROOT / "assets"
+MODEL_PATH = PROJECT_ROOT / "model_terbaik.keras"
+CLASS_MAP_PATH = PROJECT_ROOT / "class_names.json"
+IMAGE_SIZE = (224, 224)
+BATCH_SIZE = 32
+EPOCHS = 25
+EXPECTED_CLASSES = ["aluminium", "glass", "plastic"]
+SEED = 42
 
 
-# --- 2. Membangun Model ---
-base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+def main():
+    if not DATA_DIR.is_dir():
+        raise FileNotFoundError(
+            f"Dataset folder not found: {DATA_DIR}. Create assets/aluminium, "
+            "assets/glass, and assets/plastic first."
+        )
 
-for layer in base_model.layers:
-    layer.trainable = False
+    found_classes = sorted(p.name for p in DATA_DIR.iterdir() if p.is_dir())
+    if found_classes != EXPECTED_CLASSES:
+        raise ValueError(
+            f"Dataset must contain exactly {EXPECTED_CLASSES}; found {found_classes}"
+        )
 
-x = base_model.output
-x = GlobalAveragePooling2D()(x)
-x = Dense(1024, activation='relu')(x)
-predictions = Dense(train_generator.num_classes, activation='softmax')(x)
+    extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+    counts = {
+        name: sum(1 for p in (DATA_DIR / name).rglob("*")
+                  if p.is_file() and p.suffix.lower() in extensions)
+        for name in EXPECTED_CLASSES
+    }
+    print("Dataset image counts:", counts)
+    insufficient = {k: v for k, v in counts.items() if v < 5}
+    if insufficient:
+        raise ValueError(f"At least 5 images per class are required: {insufficient}")
 
-model = Model(inputs=base_model.input, outputs=predictions)
+    CLASS_MAP_PATH.write_text(json.dumps(EXPECTED_CLASSES, indent=2), encoding="utf-8")
 
-# --- 3. Kompilasi dan Latih Model ---
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    train_datagen = ImageDataGenerator(
+        preprocessing_function=preprocess_input,
+        validation_split=0.2,
+        rotation_range=15,
+        width_shift_range=0.12,
+        height_shift_range=0.12,
+        zoom_range=0.12,
+        horizontal_flip=True,
+        fill_mode="nearest",
+    )
+    val_datagen = ImageDataGenerator(
+        preprocessing_function=preprocess_input,
+        validation_split=0.2,
+    )
+    train_data = train_datagen.flow_from_directory(
+        str(DATA_DIR), classes=EXPECTED_CLASSES, target_size=IMAGE_SIZE,
+        batch_size=BATCH_SIZE, class_mode="categorical",
+        subset="training", shuffle=True, seed=SEED,
+    )
+    val_data = val_datagen.flow_from_directory(
+        str(DATA_DIR), classes=EXPECTED_CLASSES, target_size=IMAGE_SIZE,
+        batch_size=BATCH_SIZE, class_mode="categorical",
+        subset="validation", shuffle=False, seed=SEED,
+    )
 
-model_path = project_root / 'model_terbaik.h5'
-checkpoint = ModelCheckpoint(str(model_path), monitor='val_accuracy', save_best_only=True, mode='max')
-early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+    print("Class index mapping:", train_data.class_indices)
+    base_model = MobileNetV2(
+        weights="imagenet", include_top=False, input_shape=(224, 224, 3)
+    )
+    base_model.trainable = False
 
-# Latih model
-history = model.fit(
-    train_generator,
-    validation_data=validation_generator,
-    epochs=10,
-    callbacks=[checkpoint, early_stopping]
-)
+    inputs = tf.keras.Input(shape=(224, 224, 3))
+    x = base_model(inputs, training=False)
+    x = GlobalAveragePooling2D()(x)
+    x = Dropout(0.25)(x)
+    outputs = Dense(3, activation="softmax")(x)
+    model = Model(inputs, outputs)
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+        loss="categorical_crossentropy",
+        metrics=["accuracy"],
+    )
+
+    callbacks = [
+        ModelCheckpoint(
+            str(MODEL_PATH), monitor="val_accuracy",
+            save_best_only=True, mode="max", verbose=1,
+        ),
+        EarlyStopping(
+            monitor="val_loss", patience=6,
+            restore_best_weights=True, verbose=1,
+        ),
+        ReduceLROnPlateau(
+            monitor="val_loss", factor=0.2, patience=3,
+            min_lr=1e-6, verbose=1,
+        ),
+    ]
+    model.fit(train_data, validation_data=val_data, epochs=EPOCHS, callbacks=callbacks)
+    print(f"Training complete. Best model: {MODEL_PATH}")
+    print(f"Class mapping: {CLASS_MAP_PATH}")
 
 
-# --- 4. Model terbaik disimpan oleh ModelCheckpoint ---
-print(f"Model terbaik disimpan di: {model_path}")
+if __name__ == "__main__":
+    main()
