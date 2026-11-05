@@ -1,70 +1,129 @@
-# Waste Image Classifier
+# Bottle Material Classification
 
-A TensorFlow/Keras image classifier that predicts one of 11 waste-item classes:
-Beer, Glass cup, HDPE, Mug, Other, PET, Plastic cup, Soda, Tin, Tumbler, and
-Wine. The prediction script opens a file picker and prints the predicted class
-and score.
+A Windows desktop application that uses a webcam and a TensorFlow/Keras
+MobileNetV2 model to classify a bottle image into exactly three material
+classes:
+
+- **glass** — glass bottles
+- **plastic** — plastic bottles
+- **aluminium** — aluminium containers, only if this matches the project's
+  agreed definition and dataset scope
+
+The app shows a live camera preview, predicts periodically, displays a
+confidence score, and can switch between detected cameras.
+
+> This project is an image **classifier**, not an object detector. It classifies
+> the whole camera frame; it does not draw bounding boxes or independently
+> classify several bottles in one frame. Keep one bottle prominent in the view
+> for the most meaningful prediction.
 
 ## Project files
 
-- `machine_model/machine_model/train.py` trains the classifier.
-- `machine_model/machine_model/test_model.py` predicts the class of a selected image.
-- `model_terbaik.h5` is the trained model used by the prediction script.
-- `assets/` is the local training dataset and is intentionally excluded from
-  this public Git repository. Do not redistribute images unless their licenses
-  permit it.
+- `live_camera.py` — live webcam classification app.
+- `machine_model/machine_model/train.py` — trains the three-class model.
+- `machine_model/machine_model/test_model.py` — backward-compatible launcher
+  for the live camera app.
+- `class_names.json` — exact output label order.
+- `model_terbaik.keras` — generated model file; not committed to Git.
+- `assets/` — local training dataset; intentionally excluded from Git.
 
-## Requirements
+## 1. Prepare the dataset
 
-- Python with TensorFlow available for your operating system and Python version.
-- Dependencies listed in `requirements.txt`.
-- Tkinter for the image picker (usually included with desktop Python on Windows).
-
-Install the Python dependencies:
-
-```bash
-python -m pip install -r requirements.txt
-```
-
-## Predict an image
-
-From the project root, run:
-
-```bash
-python machine_model/machine_model/test_model.py
-```
-
-Choose an image in the file picker. The script loads `model_terbaik.h5` from
-the project root, regardless of the current working directory.
-
-## Train the model
-
-Place the training images under `assets/`, with one subdirectory per class.
-For example:
+Create this structure in the repository root:
 
 ```text
 assets/
-  beer/
-  glass_cup/
-  hdpe/
-  mug/
-  other/
-  pet/
-  plastic_cup/
-  soda/
-  tin/
-  tumbler/
-  wine/
+  aluminium/
+  glass/
+  plastic/
 ```
 
-Run training from the project root:
+Put only images that belong to the matching class into each folder. Do not
+move the old 11-class images into these folders based only on their old names.
+For example, `Beer`, `Soda`, and `Wine` do not tell us whether the container
+is glass, plastic, or aluminium. Inspect each image and assign it by actual
+material.
 
-```bash
+Remove unrelated objects such as mugs, cups, and tumblers unless the research
+scope explicitly includes them as bottles. Aim for a balanced dataset with
+varied lighting, backgrounds, camera angles, bottle colors, and shapes. Keep
+separate real-world test images out of the training dataset.
+
+The training script checks for at least 5 images per class to make a split.
+This is only a technical minimum, not enough data for a reliable model.
+More varied, correctly labeled examples are strongly recommended.
+
+**Class definition:** decide whether the aluminium class means aluminium
+bottles only or also beverage cans. If the research topic is specifically
+bottles, do not silently include cans; define and apply the scope consistently.
+
+## 2. Install dependencies (Windows)
+
+Open PowerShell or Command Prompt in the repository root. Create and activate
+a virtual environment:
+
+```powershell
+py -m venv .venv
+.venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+TensorFlow installation depends on the installed Python version and hardware.
+If installation fails, use a Python version supported by the TensorFlow release
+available for your Windows setup.
+
+## 3. Train the three-class model
+
+From the repository root:
+
+```powershell
 python machine_model/machine_model/train.py
 ```
 
-The best validation-accuracy model is saved as `model_terbaik.h5` in the
-project root. Keep a local copy of the dataset, or distribute it through a
-separate dataset host only when you have the right to share it. Git LFS can
-store large files in a GitHub repository, but has separate storage and
-bandwidth limits.
+The script checks that the dataset contains exactly the three expected
+folders, uses an 80/20 training/validation split, and saves:
+
+- `model_terbaik.keras` — best model selected by validation accuracy.
+- `class_names.json` — exact output order used by the model.
+
+The model file is generated locally and is not included in this repository.
+Do not run the webcam app until training has completed successfully.
+
+## 4. Run live webcam classification
+
+From the repository root:
+
+```powershell
+python live_camera.py
+```
+
+Controls:
+
+- **Q** — quit the application.
+- **C** — switch to another detected camera.
+
+The app scans camera indexes 0–5 and opens the first working camera. It runs
+inference every few frames to keep the preview responsive. Predictions below
+60% confidence are displayed as **Uncertain / not recognized**. This threshold
+is a starting point and should be calibrated using a separate validation/test
+set; it is not a guarantee that an uncertain prediction is truly an unknown
+object.
+
+You can also launch it through the old script path:
+
+```powershell
+python machine_model/machine_model/test_model.py
+```
+
+## Evaluation and limitations
+
+- The model predicts one label for the entire frame. Keep one bottle centered
+  and clearly visible.
+- It does not detect bottle boundaries, count objects, or handle multiple
+  bottles independently.
+- Confidence is not the same as accuracy. Evaluate on held-out images and
+  report a confusion matrix, precision, recall, and F1-score.
+- Avoid near-duplicate photos of the same physical bottle in both training and
+  validation/test sets; this can make evaluation look better than real-world
+  performance.
