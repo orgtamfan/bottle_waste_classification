@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.pyd
 .venv/
+.venv-gpu/
 venv/
 env/
 
@@ -24,3 +25,11 @@ Thumbs.db
 *.log
 .pytest_cache/
 .mypy_cache/
+
+# Locally trained model artifacts
+/model_terbaik.keras
+/model_terbaik.h5
+*.pt
+/runs/
+machine_model/machine_model/yolo_train.txt
+machine_model/machine_model/yolo_val.txt

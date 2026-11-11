@@ -1,3 +1,5 @@
 tensorflow
 numpy
+scipy
 Pillow
+opencv-python

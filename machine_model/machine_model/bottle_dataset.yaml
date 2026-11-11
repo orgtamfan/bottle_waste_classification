@@ -1,0 +1,7 @@
+train: D:/Projects/bottle_waste_classification/machine_model/machine_model/yolo_train.txt
+val: D:/Projects/bottle_waste_classification/machine_model/machine_model/yolo_val.txt
+names:
+  0: aluminium
+  1: glass
+  2: hdpe
+  3: plastic
