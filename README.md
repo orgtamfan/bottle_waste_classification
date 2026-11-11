@@ -1,13 +1,13 @@
 # Bottle Material Classification
 
 A Windows desktop application that uses a webcam and a TensorFlow/Keras
-MobileNetV2 model to classify a bottle image into exactly three material
+MobileNetV2 model to classify a bottle image into exactly four material
 classes:
 
-- **glass** — glass bottles
-- **plastic** — plastic bottles
-- **aluminium** — aluminium containers, only if this matches the project's
-  agreed definition and dataset scope
+- **aluminium** — aluminium containers / cans
+- **glass** — glass containers
+- **plastic** — plastic containers (excluding HDPE bottles)
+- **hdpe** — HDPE containers
 
 The app shows a live camera preview, predicts periodically, displays a
 confidence score, and can switch between detected cameras.
@@ -20,7 +20,7 @@ confidence score, and can switch between detected cameras.
 ## Project files
 
 - `live_camera.py` — live webcam classification app.
-- `machine_model/machine_model/train.py` — trains the three-class model.
+- `machine_model/machine_model/train.py` — trains the four-class model.
 - `machine_model/machine_model/test_model.py` — backward-compatible launcher
   for the live camera app.
 - `class_names.json` — exact output label order.
@@ -35,14 +35,14 @@ Create this structure in the repository root:
 assets/
   aluminium/
   glass/
+  hdpe/
   plastic/
 ```
 
-Put only images that belong to the matching class into each folder. Do not
-move the old 11-class images into these folders based only on their old names.
-For example, `Beer`, `Soda`, and `Wine` do not tell us whether the container
-is glass, plastic, or aluminium. Inspect each image and assign it by actual
-material.
+Put only images that belong to the matching class into each folder. The
+training script uses the folder name as the image label and ignores any YOLO
+`.txt` annotation files that may sit beside the images. Inspect each image and
+assign it to its actual material class; filenames alone may not be reliable.
 
 Remove unrelated objects such as mugs, cups, and tumblers unless the research
 scope explicitly includes them as bottles. Aim for a balanced dataset with
@@ -73,7 +73,7 @@ TensorFlow installation depends on the installed Python version and hardware.
 If installation fails, use a Python version supported by the TensorFlow release
 available for your Windows setup.
 
-## 3. Train the three-class model
+## 3. Train the four-class model
 
 From the repository root:
 
@@ -81,7 +81,7 @@ From the repository root:
 python machine_model/machine_model/train.py
 ```
 
-The script checks that the dataset contains exactly the three expected
+The script checks that the dataset contains exactly the four expected
 folders, uses an 80/20 training/validation split, and saves:
 
 - `model_terbaik.keras` — best model selected by validation accuracy.

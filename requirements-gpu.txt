@@ -1,0 +1,10 @@
+# Native Windows GPU environment (Python 3.10 only).
+# TensorFlow DirectML is a legacy backend; use this file only in .venv-gpu.
+tensorflow-cpu==2.10.0
+tensorflow-directml-plugin==0.4.0.dev230202
+numpy==1.23.5
+scipy==1.15.3
+Pillow
+opencv-python==4.10.0.84
+PyYAML
+ultralytics

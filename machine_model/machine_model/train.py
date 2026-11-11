@@ -1,4 +1,4 @@
-"""Train a three-class bottle-material classifier."""
+"""Train a four-class bottle-material classifier (aluminium, glass, plastic, hdpe)."""
 import json
 from pathlib import Path
 
@@ -17,21 +17,22 @@ CLASS_MAP_PATH = PROJECT_ROOT / "class_names.json"
 IMAGE_SIZE = (224, 224)
 BATCH_SIZE = 32
 EPOCHS = 25
-EXPECTED_CLASSES = ["aluminium", "glass", "plastic"]
+EXPECTED_CLASSES = ["aluminium", "glass", "plastic", "hdpe"]
 SEED = 42
 
 
 def main():
     if not DATA_DIR.is_dir():
         raise FileNotFoundError(
-            f"Dataset folder not found: {DATA_DIR}. Create assets/aluminium, "
-            "assets/glass, and assets/plastic first."
+            f"Dataset folder not found: {DATA_DIR}. Create assets/aluminium, assets/glass, assets/plastic, and assets/hdpe first.",
         )
 
-    found_classes = sorted(p.name for p in DATA_DIR.iterdir() if p.is_dir())
-    if found_classes != EXPECTED_CLASSES:
+    found_classes = {p.name for p in DATA_DIR.iterdir() if p.is_dir()}
+    expected_classes = set(EXPECTED_CLASSES)
+    if found_classes != expected_classes:
         raise ValueError(
-            f"Dataset must contain exactly {EXPECTED_CLASSES}; found {found_classes}"
+            "Dataset must contain exactly "
+            f"{sorted(expected_classes)}; found {sorted(found_classes)}"
         )
 
     extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -82,7 +83,7 @@ def main():
     x = base_model(inputs, training=False)
     x = GlobalAveragePooling2D()(x)
     x = Dropout(0.25)(x)
-    outputs = Dense(3, activation="softmax")(x)
+    outputs = Dense(len(EXPECTED_CLASSES), activation="softmax")(x)
     model = Model(inputs, outputs)
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
